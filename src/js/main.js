@@ -415,12 +415,14 @@ async function startApp() {
     if (entry && entry.view && entry.view.onTrack) entry.view.onTrack(t);
   });
   player.on('error', (err) => {
+    // The browser reports this when one load replaces another (e.g. pressing a new track quickly). It is harmless.
+    if (err && (err.name === 'AbortError' || /interrupted by a new load request|interrupted by a call to pause/i.test(String(err.message || '')))) return;
     console.error('Player error', err);
     const code = err && (err.errorCode || err.code);
     const id = err && err.errorId;
     const detail = [id, code].filter(Boolean).join(' / ');
     app.logError('Playback', err);
-    if (code === 'PRIVILEGES_REVOKED') app.toast('Playback moved to another device');
+    if (code === 'PRIVILEGES_REVOKED') app.toast('Tidal is playing on another device. Press play to play here instead.');
     else if (/^(EUN|PEPerm|PENot)/.test(String(id || ''))) app.toast(`Tidal does not allow this track here (${detail})`);
     else app.toast(`This track could not be played${detail ? ` (${detail})` : ''}`);
   });
