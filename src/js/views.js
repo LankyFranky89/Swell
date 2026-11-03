@@ -632,11 +632,98 @@ export function settingsView(app) {
 
 // ------------------------------------------------------------------ Sign in
 export function signInView(app, { missingClientId } = {}) {
-  const steps = [
-    ['Choose Sign in', "Tidal's login page opens on this TV."],
-    ['Enter your details', 'Type with the on-screen keyboard, or point with the Magic Remote.'],
-    ['Allow access and return', 'Approve the permissions, and you land back on Home.'],
-  ];
+  const panel = h('section', { class: 'signin-steps' });
+  const codeSteps = () =>
+    fill(
+      panel,
+      h('span', { class: 'eyebrow' }, 'Sign in with a code'),
+      [
+        ['Choose Sign in with a code', 'A short code and a QR code appear here.'],
+        ['Open the link on your phone or PC', 'Scan the QR code, or type the address shown.'],
+        ['Log in and approve', 'Swell on the TV signs in by itself a few seconds later.'],
+      ].map(([t, d], i) =>
+        h('div', { class: 'step' }, h('span', { class: 'step-n' }, String(i + 1)), h('div', null, h('strong', null, t), h('p', null, d))),
+      ),
+      h('div', { class: 'note-box' }, icon('lock'), h('span', null, "Your password is only ever entered on Tidal's page.")),
+    );
+
+  let cancelled = false;
+  async function startCode() {
+    cancelled = false;
+    fill(panel, h('span', { class: 'eyebrow' }, 'Sign in with a code'), h('p', { class: 'lead' }, 'Asking Tidal for a code…'));
+    let auth;
+    let r;
+    try {
+      auth = await import('./auth.js');
+      r = await auth.startDeviceLogin();
+    } catch (e) {
+      console.error(e);
+      fill(
+        panel,
+        h('span', { class: 'eyebrow' }, 'Sign in with a code'),
+        h('h2', { class: 'code-error' }, 'Tidal did not give Swell a code'),
+        h('p', { class: 'muted' }, 'Tidal may only allow code sign-in for its own apps. Tell Claude the message below.'),
+        h('p', { class: 'code-detail' }, auth ? auth.describeAuthError(e) : String(e)),
+        h('div', { class: 'actions' }, button('Try again', { onClick: startCode })),
+      );
+      return;
+    }
+    // Accept both spellings Tidal's servers have used for these fields.
+    r = {
+      userCode: r.userCode || r.user_code || '',
+      verificationUri: r.verificationUri || r.verification_uri || 'link.tidal.com',
+      verificationUriComplete: r.verificationUriComplete || r.verification_uri_complete || '',
+      expiresIn: r.expiresIn || r.expires_in || 300,
+    };
+    const link = r.verificationUriComplete || r.verificationUri;
+    const shortLink = String(r.verificationUri || '').replace(/^https?:\/\//, '');
+    const qr = await qrSvg(link.startsWith('http') ? link : `https://${link}`);
+    const left = h('span', { class: 'muted' });
+    fill(
+      panel,
+      h('span', { class: 'eyebrow' }, 'Sign in with a code'),
+      h(
+        'div',
+        { class: 'code-row' },
+        h('div', { class: 'qr', html: qr }),
+        h(
+          'div',
+          { class: 'code-text' },
+          h('p', null, 'Scan with your phone, or go to'),
+          h('strong', { class: 'code-link' }, shortLink),
+          h('p', null, 'and enter'),
+          h('strong', { class: 'code' }, r.userCode),
+          left,
+        ),
+      ),
+      h('p', { class: 'muted small' }, 'Waiting for you to approve… this screen updates by itself.'),
+    );
+    const until = Date.now() + (r.expiresIn || 300) * 1000;
+    const timer = setInterval(() => {
+      const s = Math.max(0, Math.round((until - Date.now()) / 1000));
+      left.textContent = `Code expires in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    }, 1000);
+    try {
+      await auth.waitForDeviceLogin();
+      clearInterval(timer);
+      if (cancelled) return;
+      fill(panel, h('span', { class: 'eyebrow' }, 'Signed in'), h('p', { class: 'lead' }, 'Opening Swell…'));
+      location.replace(import.meta.env.BASE_URL);
+    } catch (e) {
+      clearInterval(timer);
+      console.error(e);
+      fill(
+        panel,
+        h('span', { class: 'eyebrow' }, 'Sign in with a code'),
+        h('h2', { class: 'code-error' }, 'The code expired or was not approved'),
+        h('p', { class: 'code-detail' }, auth.describeAuthError(e)),
+        h('div', { class: 'actions' }, button('Get a new code', { primary: true, onClick: startCode })),
+      );
+      app.afterSignInRender && app.afterSignInRender(panel);
+    }
+  }
+
+  codeSteps();
   return {
     el: h(
       'div',
@@ -644,31 +731,34 @@ export function signInView(app, { missingClientId } = {}) {
       h(
         'section',
         { class: 'signin-left' },
-        h('div', { class: 'brand' }, h('span', { class: 'brand-mark', html: '' }, icon('logo')), h('span', null, 'Swell')),
+        h('div', { class: 'brand' }, h('span', { class: 'brand-mark' }, icon('logo')), h('span', null, 'Swell')),
         h('h1', null, 'Sign in to your Tidal account'),
-        h('p', { class: 'lead' }, "A Tidal subscription is required. You sign in on Tidal's own page, then come straight back here."),
-        missingClientId
-          ? h('p', { class: 'warn' }, 'The Tidal client ID has not been added to Swell yet, so sign-in cannot start.')
-          : null,
+        h('p', { class: 'lead' }, 'A Tidal subscription is required. Approve the sign-in on your phone or PC, and the TV follows.'),
+        missingClientId ? h('p', { class: 'warn' }, 'The Tidal client ID has not been added to Swell yet, so sign-in cannot start.') : null,
         h(
           'div',
           { class: 'actions' },
-          button('Sign in', { primary: true, attrs: { 'data-autofocus': '', disabled: missingClientId ? '' : null }, onClick: () => app.signIn() }),
-          button('Try demo mode', { onClick: () => app.startDemo() }),
+          button('Sign in with a code', {
+            primary: true,
+            attrs: { 'data-autofocus': '', disabled: missingClientId ? '' : null },
+            onClick: startCode,
+          }),
+          button('Sign in on this TV', { attrs: { disabled: missingClientId ? '' : null }, onClick: () => app.signIn() }),
         ),
+        h('div', { class: 'actions' }, button('Try demo mode', { onClick: () => app.startDemo() })),
         h('p', { class: 'muted small' }, 'This is an unofficial app and is not affiliated with Tidal.'),
       ),
-      h(
-        'section',
-        { class: 'signin-steps' },
-        h('span', { class: 'eyebrow' }, 'What happens next'),
-        steps.map(([t, d], i) =>
-          h('div', { class: 'step' }, h('span', { class: 'step-n' }, String(i + 1)), h('div', null, h('strong', null, t), h('p', null, d))),
-        ),
-        h('div', { class: 'note-box' }, icon('lock'), h('span', null, "Your password is only ever entered on Tidal's page.")),
-      ),
+      panel,
     ),
   };
+}
+
+async function qrSvg(text) {
+  const { default: qrcode } = await import('qrcode-generator');
+  const q = qrcode(0, 'M');
+  q.addData(text);
+  q.make();
+  return q.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
 }
 
 export { fmtTime };

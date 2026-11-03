@@ -14,7 +14,8 @@
     "@tidal-music/api": "^0.56.0",
     "@tidal-music/auth": "^1.7.0",
     "@tidal-music/event-producer": "^2.6.0",
-    "@tidal-music/player": "^0.20.1"
+    "@tidal-music/player": "^0.20.1",
+    "qrcode-generator": "^1.4.4"
   },
   "devDependencies": {
     "vite": "^5.4.10"

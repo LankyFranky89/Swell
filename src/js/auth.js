@@ -40,6 +40,31 @@ export async function finishLogin(query) {
   await auth.finalizeLogin(query);
 }
 
+// Sign-in with a code: the TV shows a short code that is approved on a phone or PC.
+// Tidal may not allow this for every app; the error is passed on so the screen can say why.
+export async function startDeviceLogin() {
+  try {
+    return await auth.initializeDeviceLogin();
+  } catch (first) {
+    try {
+      return await auth.initializeDeviceLogin({ appApproval: true });
+    } catch {
+      throw first;
+    }
+  }
+}
+
+// Polls until the code is approved (or expires).
+export async function waitForDeviceLogin() {
+  await auth.finalizeDeviceLogin();
+}
+
+export function describeAuthError(e) {
+  if (!e) return 'Unknown error';
+  const parts = [e.errorCode, e.name !== 'Error' ? e.name : '', e.message].filter(Boolean);
+  return [...new Set(parts)].join(' · ');
+}
+
 export function logout() {
   auth.logout();
 }

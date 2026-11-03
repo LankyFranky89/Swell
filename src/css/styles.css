@@ -1544,3 +1544,48 @@ kbd {
   color: var(--muted);
   max-width: 760px;
 }
+
+/* sign in with a code */
+.code-row {
+  display: flex;
+  gap: 36px;
+  align-items: center;
+}
+.qr {
+  width: 300px;
+  height: 300px;
+  flex-shrink: 0;
+  padding: 14px;
+  border-radius: 20px;
+  background: #fff;
+}
+.qr svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.code-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 24px;
+  color: var(--fg2);
+}
+.code-link {
+  font-size: 34px;
+  color: var(--fg);
+}
+.code {
+  font-size: 64px;
+  letter-spacing: 6px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.code-error {
+  font-size: 34px;
+}
+.code-detail {
+  font-size: 20px;
+  color: var(--amber);
+  word-break: break-word;
+}
