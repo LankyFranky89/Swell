@@ -1,6 +1,6 @@
 // Swell configuration. The client ID is not a secret: it identifies the app,
 // it does not grant access on its own. Paste yours from developer.tidal.com.
-export const CLIENT_ID = 'PASTE_YOUR_TIDAL_CLIENT_ID_HERE';
+export const CLIENT_ID = 'jwZF2dM5qE56ke94';
 
 // Must match a redirect URI registered for the app on developer.tidal.com, letter for letter.
 export const REDIRECT_URI = 'https://lankyfranky89.github.io/Swell/callback/';
