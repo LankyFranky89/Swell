@@ -20,6 +20,19 @@ const app = {
   favorites: { album: new Set(), artist: new Set(), playlist: new Set(), track: new Set() },
 };
 
+// Recent errors, shown under Settings > Diagnostics so they can be read off the TV.
+app.errors = [];
+app.logError = (where, err) => {
+  let text;
+  if (err && (err.errorId || err.errorCode)) text = [err.errorId, err.errorCode, err.referenceId, err.message].filter(Boolean).join(' · ');
+  else if (err && err.status !== undefined) text = `HTTP ${err.status} ${err.detail ? JSON.stringify(err.detail).slice(0, 200) : ''}`;
+  else text = String((err && (err.message || err.reason)) || err);
+  app.errors.unshift({ at: new Date().toLocaleTimeString(), where, text: text.slice(0, 400) });
+  app.errors.length = Math.min(app.errors.length, 25);
+};
+window.addEventListener('error', (e) => app.logError('Script', e.error || e.message));
+window.addEventListener('unhandledrejection', (e) => app.logError('Promise', e.reason));
+
 const ROUTES = {
   home: views.homeView,
   search: views.searchView,
@@ -404,9 +417,12 @@ async function startApp() {
   player.on('error', (err) => {
     console.error('Player error', err);
     const code = err && (err.errorCode || err.code);
+    const id = err && err.errorId;
+    const detail = [id, code].filter(Boolean).join(' / ');
+    app.logError('Playback', err);
     if (code === 'PRIVILEGES_REVOKED') app.toast('Playback moved to another device');
-    else if (err && /EUN|subscription|privilege/i.test(String(err.message || err.errorId || ''))) app.toast('Your Tidal subscription does not allow this track');
-    else app.toast('This track could not be played');
+    else if (/^(EUN|PEPerm|PENot)/.test(String(id || ''))) app.toast(`Tidal does not allow this track here (${detail})`);
+    else app.toast(`This track could not be played${detail ? ` (${detail})` : ''}`);
   });
 
   try {
@@ -475,9 +491,10 @@ async function boot() {
   app.api = apiMod;
   try {
     const { createTidalEngine } = await import('./engine-tidal.js');
-    await player.init(await createTidalEngine(authMod.credentialsProvider));
+    await player.init(await createTidalEngine(authMod.credentialsProvider, app.logError));
   } catch (e) {
     console.error('Player could not start', e);
+    app.logError('Player start', e);
     showFatal('The player could not start', 'This TV may not support Tidal’s web player. Try updating the TV software.');
     return;
   }

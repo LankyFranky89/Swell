@@ -26,11 +26,12 @@ function contextInfo(ctx) {
   };
 }
 
-export async function createTidalEngine(credentialsProvider) {
+export async function createTidalEngine(credentialsProvider, log = () => {}) {
   // Play reports, so plays are counted for the artists. Failures here never stop playback.
   let sender = { sendEvent() {} };
   try {
-    await EventProducer.init({
+    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Event producer did not start in 6 s')), 6000));
+    await Promise.race([timeout, EventProducer.init({
       appInfo: { appName: APP_NAME, appVersion: APP_VERSION },
       blockedConsentCategories: { NECESSARY: false, PERFORMANCE: true, TARGETING: true },
       credentialsProvider,
@@ -45,10 +46,11 @@ export async function createTidalEngine(credentialsProvider) {
       strictMode: false,
       tlConsumerUri: EVENTS_URI,
       tlPublicConsumerUri: EVENTS_PUBLIC_URI,
-    });
+    })]);
     sender = EventProducer;
   } catch (e) {
     console.warn('Event producer unavailable', e);
+    log('Play reports', e);
   }
   const safeSender = {
     ...sender,
@@ -57,6 +59,7 @@ export async function createTidalEngine(credentialsProvider) {
         return sender.sendEvent(ev);
       } catch (e) {
         console.warn('sendEvent failed', e);
+        log('Play reports', e);
       }
     },
   };

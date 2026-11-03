@@ -622,6 +622,18 @@ export function settingsView(app) {
       h('div', { class: 'actions' }, button('Sign out', { onClick: () => app.signOut() })),
     ),
     section(
+      'Diagnostics',
+      'Recent errors. If something does not work, take a photo of this list.',
+      app.errors && app.errors.length
+        ? h(
+            'div',
+            { class: 'diag' },
+            app.errors.map((e) => h('div', { class: 'diag-row' }, h('span', { class: 'muted' }, `${e.at} · ${e.where}`), h('span', null, e.text))),
+          )
+        : h('p', { class: 'muted' }, 'No errors so far.'),
+      h('p', { class: 'muted small' }, navigator.userAgent),
+    ),
+    section(
       'About',
       null,
       h('p', { class: 'muted' }, 'Swell 0.1 · an unofficial app, not affiliated with Tidal. A Tidal subscription is required.'),
