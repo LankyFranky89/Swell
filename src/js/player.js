@@ -186,10 +186,18 @@ async function loadIndex(i, autoplay) {
   state.context = null;
   emit('track', e.track);
   emit('queue');
+  const t0 = Date.now();
+  const step = (what) => emit('trace', `${what} (${Date.now() - t0} ms) · track ${e.track.id}`);
+  const limit = (promise, what) =>
+    Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error(`${what} did not finish in 20 s`)), 20000))]);
   try {
-    await engine.load(e, 0);
-    if (autoplay) await engine.play();
+    step('Loading');
+    await limit(engine.load(e, 0), 'Loading the track');
+    step('Loaded, starting');
+    if (autoplay) await limit(engine.play(), 'Starting playback');
+    step(`Started, state ${state.playback}`);
   } catch (err) {
+    step('Failed');
     emit('error', err);
   }
   preloadNext();

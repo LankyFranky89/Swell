@@ -414,6 +414,8 @@ async function startApp() {
     const entry = stack[stack.length - 1];
     if (entry && entry.view && entry.view.onTrack) entry.view.onTrack(t);
   });
+  player.on('trace', (text) => app.logError('Step', text));
+  player.on('state', (st) => app.logError('State', st));
   player.on('error', (err) => {
     // The browser reports this when one load replaces another (e.g. pressing a new track quickly). It is harmless.
     if (err && (err.name === 'AbortError' || /interrupted by a new load request|interrupted by a call to pause/i.test(String(err.message || '')))) return;

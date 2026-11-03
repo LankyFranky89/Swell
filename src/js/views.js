@@ -623,7 +623,7 @@ export function settingsView(app) {
     ),
     section(
       'Diagnostics',
-      'Recent errors. If something does not work, take a photo of this list.',
+      'Recent steps and errors. If something does not work, take a photo of this list.',
       app.errors && app.errors.length
         ? h(
             'div',
