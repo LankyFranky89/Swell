@@ -302,7 +302,8 @@ export async function getMe() {
   const a = (doc && doc.data && doc.data.attributes) || {};
   return {
     id: doc && doc.data ? doc.data.id : 'me',
-    name: a.firstName || a.username || '',
+    // Use the first name; the username is often an email address, which should not be on screen.
+    name: a.firstName || (a.username && !a.username.includes('@') ? a.username : ''),
     country: a.country || '',
   };
 }
@@ -329,7 +330,7 @@ export const getLibrary = collection;
 async function mix(path, name) {
   try {
     const doc = await get(path, { path: { id: 'me' }, query: { include: ['items'] } });
-    const refs = relIds(doc.data, 'items');
+    const refs = relIds(Array.isArray(doc.data) ? doc.data[0] : doc.data, 'items');
     if (!refs.length) return null;
     const items = await hydrateRefs(refs.slice(0, 50));
     const tracks = items.filter((i) => i.kind === 'track');
@@ -409,7 +410,8 @@ export async function search(query) {
       include: ['topHits', 'tracks', 'albums', 'artists', 'playlists'],
     },
   });
-  const sr = doc.data;
+  // Tidal wraps the one search result in a list.
+  const sr = Array.isArray(doc.data) ? doc.data[0] : doc.data;
   const pick = async (name, n) => hydrateRefs(relIds(sr, name).slice(0, n));
   const [top, tracks, albums, artists, playlists] = await Promise.all([
     pick('topHits', 1),
