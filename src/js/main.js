@@ -492,6 +492,7 @@ async function boot() {
 
   const apiMod = await import('./api.js');
   apiMod.initApi();
+  apiMod.setErrorHook((where, text) => app.logError(where, text));
   app.api = apiMod;
   try {
     const { createTidalEngine } = await import('./engine-tidal.js');

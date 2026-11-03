@@ -20,6 +20,11 @@ export class ApiError extends Error {
   }
 }
 
+let onError = () => {};
+export function setErrorHook(fn) {
+  onError = fn;
+}
+
 export function initApi() {
   client = createAPIClient(credentialsProvider);
 }
@@ -78,10 +83,20 @@ async function get(path, { path: pathParams, query } = {}) {
   if (!client) throw new Error('API not initialised');
   const q = { ...(query || {}) };
   if (country && !('countryCode' in q)) q.countryCode = country;
-  const { data, error, response } = await client.GET(path, {
-    params: { path: pathParams, query: q },
-  });
-  if (error || !response.ok) throw new ApiError(response ? response.status : 0, error);
+  let result;
+  try {
+    result = await client.GET(path, { params: { path: pathParams, query: q } });
+  } catch (e) {
+    onError('Tidal API', `${path} → ${(e && e.message) || e}`);
+    throw new ApiError(0, e);
+  }
+  const { data, error, response } = result;
+  if (error || !response.ok) {
+    const err = new ApiError(response ? response.status : 0, error);
+    const detail = error && error.errors && error.errors[0] ? `${error.errors[0].code || ''} ${error.errors[0].detail || ''}`.trim() : '';
+    onError('Tidal API', `${path} → HTTP ${err.status}${detail ? ` · ${detail}` : ''}`);
+    throw err;
+  }
   remember(data);
   return data;
 }
