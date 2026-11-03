@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Swell</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0B0D10; color: #F2F4F7; font-family: sans-serif; }
+  .wrap { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; text-align: center; }
+  .mark { width: 72px; height: 72px; border-radius: 20px; background: #3DDBD9; }
+  h1 { margin: 0; font-size: 48px; }
+  p { margin: 0; font-size: 26px; color: #9AA3B2; max-width: 900px; line-height: 1.4; }
+  button { font: inherit; font-size: 26px; font-weight: 700; padding: 18px 40px; border: 0; border-radius: 40px; background: #F2F4F7; color: #0B0D10; }
+  button:focus { outline: 6px solid #3DDBD9; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="mark"></div>
+  <h1>Swell</h1>
+  <p id="msg">Starting…</p>
+  <button id="retry" hidden>Try again</button>
+</div>
+<script>
+  // Swell runs from its web address so Tidal's sign-in can return to it.
+  // This small launcher only opens that address.
+  var APP_URL = 'https://lankyfranky89.github.io/Swell/';
+  var msg = document.getElementById('msg');
+  var retry = document.getElementById('retry');
+  function go() {
+    if (navigator.onLine === false) {
+      msg.textContent = 'Your TV is not connected to the internet. Connect it and try again.';
+      retry.hidden = false;
+      retry.focus();
+      return;
+    }
+    window.location.replace(APP_URL);
+  }
+  retry.addEventListener('click', go);
+  document.addEventListener('keydown', function (e) {
+    if (e.keyCode === 13 && !retry.hidden) go();
+    if (e.keyCode === 461 && window.webOS && window.webOS.platformBack) window.webOS.platformBack();
+  });
+  go();
+</script>
+</body>
+</html>
