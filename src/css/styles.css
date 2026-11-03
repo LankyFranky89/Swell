@@ -1589,3 +1589,12 @@ kbd {
   color: var(--amber);
   word-break: break-word;
 }
+
+.qr-big {
+  width: 380px;
+  height: 380px;
+}
+@media (max-width: 900px) {
+  .fatal h1 { font-size: 34px; }
+  .fatal p { font-size: 20px; }
+}

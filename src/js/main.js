@@ -350,6 +350,11 @@ function showSignIn(opts) {
   focusFirst(root);
 }
 
+function showDone(title, text) {
+  const root = document.getElementById('root');
+  fill(root, h('div', { class: 'fatal' }, icon('logo', 'state-ico'), h('h1', null, title), h('p', null, text)));
+}
+
 function showFatal(title, text) {
   const root = document.getElementById('root');
   fill(root, 
@@ -436,6 +441,17 @@ async function boot() {
   // Coming back from Tidal's login page.
   if (/\/callback\/?$/.test(path)) {
     const q = location.search;
+    // Signing in for the TV: hand the one-time code to the TV instead of using it here.
+    if (authMod.isPairingCallback(q)) {
+      try {
+        await authMod.handOverToTv(q);
+        showDone('Done. Look at your TV', 'Swell on the TV signs in by itself in a few seconds. You can close this page.');
+      } catch (e) {
+        console.error(e);
+        showFatal('Could not reach the TV', 'The sign-in could not be passed to the TV. Get a new QR code on the TV and try again.');
+      }
+      return;
+    }
     if (/[?&](code|error)=/.test(q)) {
       try {
         await authMod.finishLogin(q);

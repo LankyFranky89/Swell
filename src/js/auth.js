@@ -40,23 +40,76 @@ export async function finishLogin(query) {
   await auth.finalizeLogin(query);
 }
 
-// Sign-in with a code: the TV shows a short code that is approved on a phone or PC.
-// Tidal may not allow this for every app; the error is passed on so the screen can say why.
-export async function startDeviceLogin() {
-  try {
-    return await auth.initializeDeviceLogin();
-  } catch (first) {
-    try {
-      return await auth.initializeDeviceLogin({ appApproval: true });
-    } catch {
-      throw first;
-    }
-  }
+// ---------------------------------------------------------------------------------
+// Sign in with your phone. Tidal blocks its login page in the TV browser and keeps
+// code sign-in for its own apps, so:
+//   1. The TV prepares a normal Tidal sign-in (with a secret PKCE verifier that stays
+//      on the TV) and shows the link as a QR code.
+//   2. The phone opens it, logs in, and Tidal returns to Swell's callback page on the phone.
+//   3. That page passes the one-time code to the TV through a ntfy.sh topic whose random
+//      name is in the link. The code is useless without the TV's verifier.
+//   4. The TV exchanges the code for tokens itself.
+export const PAIR_PREFIX = 'swellpair';
+const RELAY = 'https://ntfy.sh';
+
+function randomTopic() {
+  const bytes = crypto.getRandomValues(new Uint8Array(18));
+  const abc = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  return PAIR_PREFIX + [...bytes].map((b) => abc[b % abc.length]).join('');
 }
 
-// Polls until the code is approved (or expires).
-export async function waitForDeviceLogin() {
-  await auth.finalizeDeviceLogin();
+export async function startPairing() {
+  const topic = randomTopic();
+  const url = await auth.initializeLogin({ redirectUri: REDIRECT_URI, loginConfig: { state: topic } });
+  return { url, topic, since: Math.floor(Date.now() / 1000) - 5 };
+}
+
+// Wait for the phone to hand over the code, then finish sign-in on the TV.
+export async function waitForPairing({ topic, since }, { signal, timeoutMs = 10 * 60 * 1000 } = {}) {
+  const end = Date.now() + timeoutMs;
+  while (Date.now() < end) {
+    if (signal && signal.aborted) throw new Error('Cancelled');
+    let res = null;
+    try {
+      res = await fetch(`${RELAY}/${topic}/json?poll=1&since=${since}`, { signal, cache: 'no-store' });
+    } catch (e) {
+      if (signal && signal.aborted) throw e;
+    }
+    if (res && res.ok) {
+      const lines = (await res.text()).split('\n').filter(Boolean);
+      for (const line of lines) {
+        let msg;
+        try {
+          msg = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (msg.event !== 'message' || !msg.message) continue;
+        const q = new URLSearchParams(msg.message);
+        if (q.get('state') !== topic) continue;
+        if (q.get('error')) throw new Error(q.get('error_description') || q.get('error'));
+        if (q.get('code')) {
+          await auth.finalizeLogin(msg.message);
+          return;
+        }
+      }
+    }
+    await new Promise((r) => setTimeout(r, 2500));
+  }
+  throw new Error('The QR code expired. Get a new one.');
+}
+
+// On the phone's callback page: is this a TV sign-in, and if so, pass it on.
+export function isPairingCallback(query) {
+  const s = new URLSearchParams(query).get('state') || '';
+  return s.startsWith(PAIR_PREFIX);
+}
+
+export async function handOverToTv(query) {
+  const topic = new URLSearchParams(query).get('state');
+  const q = query.startsWith('?') ? query.slice(1) : query;
+  const res = await fetch(`${RELAY}/${topic}`, { method: 'POST', body: q });
+  if (!res.ok) throw new Error(`Relay answered ${res.status}`);
 }
 
 export function describeAuthError(e) {
