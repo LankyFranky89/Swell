@@ -123,7 +123,9 @@ export function titleOf(item) {
   if (!item) return '';
   if (item.kind === 'artist') return item.name;
   if (item.kind === 'playlist' || item.kind === 'mix') return item.name;
-  return item.version ? `${item.title} (${item.version})` : item.title;
+  // Skip the version when the title already contains it, e.g. "Master Of Puppets (Remastered)".
+  if (!item.version || item.title.toLowerCase().includes(item.version.toLowerCase())) return item.title;
+  return `${item.title} (${item.version})`;
 }
 
 export function subtitleOf(item) {
